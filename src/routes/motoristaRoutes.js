@@ -7,7 +7,7 @@ const verificarToken = require('../middlewares/autenticacao');
 router.get('/motoristas/perfil', verificarToken, (req, res) => {
     res.json({
         mensagem: 'Você está autenticado!',
-        dadosDoToken: req.motorista
+        dadosDoToken: req.usuario
     });
 });
 router.post('/motoristas', motoristaController.cadastrar);

@@ -29,9 +29,10 @@ function verificarToken(req, res, next) {
             return res.status(401).json({ erro: 'Token inválido ou expirado'});
         }       
         // Guarda os dados do token pra qualquer controller usar depois
-        req.motorista = {
+        req.usuario = {
             id: decodificado.id,
-            categoria: decodificado.categoria
+            tipo: decodificado.tipo,
+            categoria: decodificado.categoria // So existe se for motorista, fica undefined pra passageiro
         };
 
         next(); // Libera a mensagem

@@ -27,7 +27,7 @@ const bcrypt = require('bcrypt');
     }
 
     const token = jwt.sign(
-      { id: motorista.id, categoria: motorista.categoria },
+      { id: motorista.id, tipo: 'motorista', categoria: motorista.categoria },
       process.env.JWT_SECRET,
       { expiresIn: '7d' }
     );
