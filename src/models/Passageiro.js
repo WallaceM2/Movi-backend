@@ -1,0 +1,43 @@
+const pool = require('../config/database');
+const bcrypt = require('bcrypt');
+
+async function criar(dados) {
+    const {
+        nome, sobrenome, email, telefone, senha, data_nascimento,
+        nacionalidade, cpf, rg, cnh, regiao, estado, cidade
+    } = dados;
+
+    const senha_hash = await bcrypt.hash(senha, 10);
+
+    const query = `
+        INSERT INTO passageiros
+            (nome, sobrenome, email, telefone, senha_hash, data_nascimento,
+            nacionalidade, cpf, rg, cnh, regiao, estado, cidade)
+                VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13)
+            RETURNING id, nome, sobrenome, email, status_conta, criado_em;
+    `;
+
+    const valores = [nome, sobrenome, email, telefone, senha_hash, data_nascimento,
+        nacionalidade, cpf, rg, cnh, regiao, estado, cidade];
+
+    const resultado = await pool.query(query, valores);
+    return resultado.rows[0];    
+}
+
+async function listarTodos() {
+    const query = `
+        SELECT id, nome, sobrenome, email, status_conta, nota_media, criado_em
+        FROM passageiros
+        ORDER BY criado_em DESC;
+    `;
+    const resultado = await pool.query(query);
+    return resultado.rows;
+}
+
+async function buscarPorEmail(email) {
+    const query = `SELECT * FROM passageiros WHERE email = $1;`;
+    const resultado = await pool.query(query, [email]);
+    return resultado.rows[0];
+}
+
+module.exports = { criar, listarTodos, buscarPorEmail };
