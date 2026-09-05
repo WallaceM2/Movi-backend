@@ -40,4 +40,30 @@ async function buscarPorEmail(email) {
     return resultado.rows[0];
 }
 
-module.exports = { criar, listarTodos, buscarPorEmail };
+// Busca um passageiro específico pelo id
+async function buscarPorId(id) {
+    const query = `
+    SELECT id, nome, sobrenome, email, cpf, rg, cnh,
+           status_conta, conta_verificada, foto_perfil_url,
+           nota_media, total_avaliacoes, criado_em
+    FROM passageiros
+    WHERE id = $1;
+  `;
+    const resultado = await pool.query(query, [id]);
+    return resultado.rows[0];
+}
+
+// Atualiza o status da conta do passageiro
+
+async function atualizarStatus(id, novoStatus) {
+    const query = `
+    UPDATE passageiros
+    SET status_conta = $1, atualizado_em = NOW()
+    WHERE id = $2
+    RETURNING id, nome, sobrenome, email, status_conta;
+  `;
+    const resultado = await pool.query(query, [novoStatus, id]);
+    return resultado.rows[0];
+}
+
+module.exports = { criar, listarTodos, buscarPorEmail, buscarPorId, atualizarStatus };

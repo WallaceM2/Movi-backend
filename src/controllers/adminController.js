@@ -2,7 +2,7 @@ const bcrypt = require('bcrypt');
 const jwt = require('jsonwebtoken');
 const Admin = require('../models/Admin');
 const Motorista = require('../models/Motorista');
-const Passagerio = require('../models/Passageiro');
+const Passageiro = require('../models/Passageiro');
 
 async function login(req, res) {
     try {
@@ -88,9 +88,9 @@ async function listarPassageiros(req, res) {
 
                     if (!statusValido.includes(status)) {
                         return res.status(400).json({
-                            erro: `Status inválido. Use um dos: ${statusValidos.join(', ')}`
-                        });
-                    }
+                            erro: `Status inválido. Use um dos: ${statusValido.join(', ')}`   // agora bate com o nome criado
+                });
+            }
 
             const motoristaAtualizado = await Motorista.atualizarStatus(id, status);
                     if (!motoristaAtualizado) {
@@ -107,4 +107,52 @@ async function listarPassageiros(req, res) {
         }
     }
 
-module.exports = { login, listarMotoristas, listarPassageiros, verMotorista, atualizarStatusMotorista };
+    async function verPassageiro(req, res) {
+        try {
+            const { id } = req.params;
+            const passageiro = await Passageiro.buscarPorId(id);
+
+                if (!passageiro) {
+                    return res.status(404).json({ erro: 'Passageiro não encontrado.' });
+            }
+            res.json(passageiro);
+        } catch (erro) {
+            console.log(erro);
+            res.status(500).json({ erro: 'Erro ao buscar passageiro '});
+        }
+    }
+
+
+    async function atualizarStatusPassageiro(req, res) {
+    try {
+        const { id } = req.params;
+        const { status } = req.body;
+
+        const statusValido = ['ativo', 'em_analise', 'suspenso', 'banido'];
+
+        if (!statusValido.includes(status)) {
+            return res.status(400).json({
+                erro: `Status inválido. Use um dos: ${statusValido.join(', ')}`
+            });
+        }
+
+        const passageiroAtualizado = await Passageiro.atualizarStatus(id, status);
+
+        if (!passageiroAtualizado) {
+            return res.status(404).json({ erro: 'Passageiro não encontrado.' });
+        }
+
+        res.json({
+            mensagem: `Status do passageiro atualizado para "${status}".`,
+            passageiro: passageiroAtualizado
+        });
+    } catch (erro) {
+        console.log(erro);
+        res.status(500).json({ erro: 'Erro ao atualizar status do passageiro.' });
+    }
+}
+
+
+module.exports = { login, listarMotoristas, listarPassageiros, verMotorista, atualizarStatusMotorista,
+    verPassageiro, atualizarStatusPassageiro
+ };

@@ -14,6 +14,9 @@ router.get('/admin/passageiros', verificarToken, permitirTipo('admin'), adminCon
 router.get('/admin/motoristas/:id', verificarToken, permitirTipo('admin'), adminController.verMotorista);
 router.patch('/admin/motoristas/:id/status', verificarToken, permitirTipo('admin'), adminController.atualizarStatusMotorista);
 router.post('/admin/login', limiteLogin, validar(loginSchema), adminController.login);
+router.get('/admin/passageiros/:id', verificarToken, permitirTipo('admin'), adminController.verPassageiro);
+router.patch('/admin/passageiros/:id/status', verificarToken, permitirTipo('admin'), adminController.atualizarStatusPassageiro);
+
 
 
 module.exports = router;
