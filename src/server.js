@@ -24,3 +24,6 @@ app.listen(PORT, () => {
 
 const passageiroRoutes = require('./routes/passageiroRoutes');
 app.use('/api', passageiroRoutes);
+
+const adminRoutes = require('./routes/adminRoutes');
+app.use('/api', adminRoutes);
