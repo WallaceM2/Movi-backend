@@ -45,4 +45,30 @@ async function listarTodos () {
             return resultado.rows[0]; // retorna UNDEFINED se nao encontrar no banco!
     }
 
-module.exports = { criar, listarTodos, buscarPorEmail };
+// Busca um motorista específico pelo id (usado pra ver detalhes antes de aprovar)
+    async function buscarPorId(id) {
+        const query = `
+            SELECT id, nome, sobrenome, email, cpf, rg, cnh, categoria,
+           status_cadastro, documento_veiculo_url, documento_veiculo_tipo,
+           foto_perfil_url, criado_em
+            FROM motoristas
+            WHERE id = $1;
+        `;
+        const resultado = await pool.query(query, [id]);
+        return resultado.rows[0];
+    }
+
+// Atualiza o status de cadastro do motorista (aprovar, reprovar, suspender, banir)
+    async function atualizarStatus(id, novoStatus) {
+        const query = `
+            UPDATE motoristas
+            SET status_cadastro = $1, atualizado_em = NOW()
+            WHERE id = $2
+            RETURNING id, nome, sobrenome, email, status_cadastro;
+         `;
+
+         const resultado = await pool.query(query, [novoStatus, id]);
+         return resultado.rows[0];
+    }
+
+module.exports = { criar, listarTodos, buscarPorEmail, buscarPorId, atualizarStatus };

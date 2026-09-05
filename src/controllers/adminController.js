@@ -62,4 +62,49 @@ async function listarPassageiros(req, res) {
     }
 }
 
-module.exports = { login, listarMotoristas, listarPassageiros };
+// Ver detalhes de um motorista específico (documentos, status atual, etc)
+
+    async function verMotorista(req, res) {
+        try {
+            const { id } = req.params;
+            const motorista = await Motorista.buscarPorId(id);
+
+            if (!motorista) {
+                return res.status(404).json({ erro: 'Motorista não encontrado.'});
+            }
+                res.json(motorista);
+        } catch (erro) {
+            console.log(erro);
+            res.status(500).json({ erro: 'Erro ao buscar motorista.' });
+        }
+    }
+
+    // Aprova ou reprova o cadastro de um motorista
+    async function atualizarStatusMotorista(req, res) {
+        try {
+            const { id } = req.params;
+            const { status } = req.body;
+                const statusValido = ['em_analise', 'aprovado', 'reprovado', 'suspenso', 'banido']; 
+
+                    if (!statusValido.includes(status)) {
+                        return res.status(400).json({
+                            erro: `Status inválido. Use um dos: ${statusValidos.join(', ')}`
+                        });
+                    }
+
+            const motoristaAtualizado = await Motorista.atualizarStatus(id, status);
+                    if (!motoristaAtualizado) {
+                        return res.status(404).json({ erro: 'Motorista não encontrado.'});
+                    }
+
+                    res.json({
+                        mensagem: `Status do motorista atualizado para "${status}".`,
+                        motorista: motoristaAtualizado
+                    });
+        } catch (erro) {
+            console.log(erro);
+            res.status(500).json({ erro: 'Erro ao atualizar status do motorista.' });
+        }
+    }
+
+module.exports = { login, listarMotoristas, listarPassageiros, verMotorista, atualizarStatusMotorista };
