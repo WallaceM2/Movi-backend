@@ -8,7 +8,7 @@ const app = express();
 const PORT = process.env.PORT || 3000;
 
 // Permite que o servidor entenda o JSON no corpo das requisicoes
-app.use(express.json());
+app.use(express.json({ limit: '10kb'}));
 
 const motoristaRoutes = require('./routes/motoristaRoutes');
 app.use('/api', motoristaRoutes);
@@ -27,3 +27,9 @@ app.use('/api', passageiroRoutes);
 
 const adminRoutes = require('./routes/adminRoutes');
 app.use('/api', adminRoutes);
+
+const helmet = require('helmet');
+app.use(helmet());
+
+const { limiteGeral } = require('./middlewares/rateLimiter');
+app.use('/api', limiteGeral);
