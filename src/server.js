@@ -35,3 +35,6 @@ app.use(helmet());
 
 const { limiteGeral } = require('./middlewares/rateLimiter');
 app.use('/api', limiteGeral);
+
+const avaliacaoRoutes = require('./routes/avaliacaoRoutes');
+app.use('/api', avaliacaoRoutes);
