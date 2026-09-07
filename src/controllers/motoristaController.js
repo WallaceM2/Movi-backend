@@ -91,4 +91,34 @@ const bcrypt = require('bcrypt');
             res.status(500).json({ erro: 'Erro ao buscar motoristas.'});
         }
     }
-module.exports = {cadastrar, listar, login};
+
+    async function uploadDocumentos(req, res) {
+      try {
+        const { id } = req.usuario; // vem do token, não do body — mais seguro
+        const arquivos = req.files;
+        const atualizacoes = {};
+          if (arquivos.rg) {
+            atualizacoes.rg_foto_url = `/uploads/motoristas/${id}/${arquivos.rg[0].filename}`;
+          }
+          if (arquivos.cnh) {
+            atualizacoes.cnh_foto_url = `/uploads/motoristas/${id}/${arquivos.cnh[0].filename}`;
+          }
+          if (arquivos.foto_perfil) {
+            atualizacoes.foto_perfil_url = `/uploads/motoristas/${id}/${arquivos.foto_perfil[0].filename}`;
+          }
+          if (arquivos.documento_veiculo) {
+            atualizacoes.documento_veiculo_url = `/uploads/motoristas/${id}/${arquivos.documento_veiculo[0].filename}`;
+          }
+
+          const motoristaAtualizado = await Motorista.atualizarDocumentos(id, atualizacoes);
+
+          res.json({
+            mensagem: 'Documentos enviados com sucesso! Aguardando análise.',
+            motorista: motoristaAtualizado
+          });
+      } catch (erro) {
+        console.log(erro);
+          res.status(500).json({ erro: 'Erro ao enviar documentos.'});
+      }
+    }
+module.exports = {cadastrar, listar, login, uploadDocumentos};

@@ -77,5 +77,33 @@ async function cadastrar(req, res) {
         }
 }
 
-module.exports = { cadastrar, listar, login };
+    async function uploadDocumentos(req, res) {
+        try {
+            const { id } = req.usuario;
+            const arquivos = req.files;
+            const atualizacoes = {};
+
+                if (arquivos.rg) {
+                    atualizacoes.rg_foto_url = `/uploads/passageiros/${id}/${arquivos.rg[0].filename}`;
+                }
+                if (arquivos.cnh) {
+                    atualizacoes.cnh_foto_url = `/uploads/passageiros/${id}/${arquivos.cnh[0].filename}`;
+                }
+                if (arquivos.foto_perfil) {
+                    atualizacoes.foto_perfil_url = `/uploads/passageiros/${id}/${arquivos.foto_perfil[0].filename}`;
+                }
+
+            const passageiroAtualizado = await Passageiro.atualizarDocumentos(id, atualizacoes);
+                    res.json({
+                        mensagem: 'Documentos enviados com sucesso! Aguardando análise.',
+                        passageiro: passageiroAtualizado
+                    });
+
+        } catch (erro) {
+            console.log(erro);
+                res.status(500).json({ erro: 'Erro ao enviar documentos.'});
+        }
+    }
+
+module.exports = { cadastrar, listar, login, uploadDocumentos };
     

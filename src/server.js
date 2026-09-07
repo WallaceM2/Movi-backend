@@ -10,6 +10,8 @@ const PORT = process.env.PORT || 3000;
 // Permite que o servidor entenda o JSON no corpo das requisicoes
 app.use(express.json({ limit: '10kb'}));
 
+app.use('/uploads', express.static('uploads'));
+
 const motoristaRoutes = require('./routes/motoristaRoutes');
 app.use('/api', motoristaRoutes);
 

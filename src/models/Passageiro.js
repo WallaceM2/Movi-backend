@@ -66,4 +66,24 @@ async function atualizarStatus(id, novoStatus) {
     return resultado.rows[0];
 }
 
-module.exports = { criar, listarTodos, buscarPorEmail, buscarPorId, atualizarStatus };
+// Atualiza os documentos do passageiro
+async function atualizarDocumentos(id, campos) {
+    const colunas = Object.keys(campos);
+        if (colunas.length === 0) return null;
+    
+    const sets = colunas.map((coluna, i) => `${coluna} = $${i + 1}`).join(', ');
+    const valores = Object.values(campos);    
+    
+    const query = `
+            UPDATE passageiros
+            SET ${sets}, atualizado_em = NOW()
+            WHERE id = $${colunas.length + 1}
+            RETURNING id, nome, rg_foto_url, cnh_foto_url, foto_perfil_url;
+        `;
+
+    const resultado = await pool.query(query, [...valores, id]);
+    return resultado.rows[0];
+        
+}
+
+module.exports = { criar, listarTodos, buscarPorEmail, buscarPorId, atualizarStatus, atualizarDocumentos };

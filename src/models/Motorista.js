@@ -70,5 +70,24 @@ async function listarTodos () {
          const resultado = await pool.query(query, [novoStatus, id]);
          return resultado.rows[0];
     }
+// Atualiza dinamicamente só os campos de documento que vieram no upload
+    async function atualizarDocumentos(id, campos) {
+        const colunas = Object.keys(campos);
+            if (colunas.length === 0) return null;
+                
+        const sets = colunas.map((coluna, i) => `${coluna} = $${i + 1}`).join(', ');
+        const valores = Object.values(campos);
 
-module.exports = { criar, listarTodos, buscarPorEmail, buscarPorId, atualizarStatus };
+        const query = `
+            UPDATE motoristas
+            SET ${sets}, atualizado_em = NOW()
+            WHERE id = $${colunas.length + 1}
+            RETURNING id, nome, rg_foto_url, cnh_foto_url, foto_perfil_url, documento_veiculo_url;
+        `;
+
+        const resultado = await pool.query(query, [...valores, id]);
+        return resultado.rows[0];
+            
+    }
+
+module.exports = { criar, listarTodos, buscarPorEmail, buscarPorId, atualizarStatus, atualizarDocumentos };
