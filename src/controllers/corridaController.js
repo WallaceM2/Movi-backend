@@ -1,11 +1,32 @@
 const Corrida = require('../models/Corrida');
 const redisClient = require('../config/redis');
+const { calcularRota } = require('../services/mapsService');
+
+async function estimar(req, res) {
+    try {
+        const { origem_lat, origem_lng, destino_lat, destino_lng, categoria, dinamica } = req.body;
+        const multiplicador = dinamica || 1.0; 
+        const estimativa = await calcularRota(origem_lat, origem_lng, destino_lat, destino_lng, categoria, multiplicador);
+        
+        return res.json({
+            mensagem: 'Estimativa calculada com sucesso',
+            estimativa
+        });
+    } catch (erro) {
+        console.error('Erro ao estimar rota:', erro);
+        return res.status(500).json({ erro: 'Não foi possível calcular a rota com o mapa.' });
+    }
+}
 
 async function solicitarCorrida(req, res) {
     try {
-        const { origem, destino, valor, origem_lat, origem_lng, destino_lat, destino_lng } = req.body;
+        const { origem, destino, origem_lat, origem_lng, destino_lat, destino_lng, categoria } = req.body;
         const passageiro_id = req.usuario.id; 
 
+        // O Backend calcula o valor oficial
+        const estimativaOficial = await calcularRota(origem_lat, origem_lng, destino_lat, destino_lng, categoria);
+
+        // Gravamos no banco o valor blindado
         const novaCorrida = await Corrida.criar({ 
             passageiro_id, 
             origem, 
@@ -14,10 +35,11 @@ async function solicitarCorrida(req, res) {
             origem_lng, 
             destino_lat, 
             destino_lng, 
-            valor, 
+            valor: estimativaOficial.valorPassageiro,
             status: 'solicitada' 
         });
 
+        // Busca motoristas
         const motoristasProximos = await redisClient.geoSearch(
             'motoristas_disponiveis',
             { latitude: origem_lat, longitude: origem_lng },
@@ -27,16 +49,25 @@ async function solicitarCorrida(req, res) {
 
         if (motoristasProximos.length > 0) {
             const motoristaIdProximo = motoristasProximos[0]; 
-            
             const socketId = await redisClient.get(`motorista_socket:${motoristaIdProximo}`);
             
             if (socketId) {
                 const io = req.app.get('io');
+                const ganhoPorKm = (estimativaOficial.ganhoMotorista / estimativaOficial.distanciaKm).toFixed(2);
+
                 io.to(socketId).emit('nova_oferta_corrida', {
                     corrida_id: novaCorrida.id,
-                    origem, 
-                    destino, 
-                    valor,
+                    local_embarque: origem, 
+                    local_desembarque: destino, 
+                    valor_motorista: estimativaOficial.ganhoMotorista, 
+                    ganho_por_km: parseFloat(ganhoPorKm),
+                    distancia_km: estimativaOficial.distanciaKm,
+                    tempo_minutos: estimativaOficial.tempoMin,
+                    conta_verificada: true, 
+                    coordenadas: {
+                        origem: { lat: origem_lat, lng: origem_lng },
+                        destino: { lat: destino_lat, lng: destino_lng }
+                    },
                     tempo_para_aceitar: 15 
                 });
             }
@@ -45,6 +76,7 @@ async function solicitarCorrida(req, res) {
         res.status(201).json({ 
             mensagem: 'Corrida solicitada com sucesso!', 
             corrida: novaCorrida,
+            detalhes_valores: estimativaOficial,
             motoristas_encontrados: motoristasProximos.length
         });
     } catch (erro) {
@@ -53,7 +85,7 @@ async function solicitarCorrida(req, res) {
     }
 }
 
-async function aceitar(req, res) {
+async function aceitarCorrida(req, res) {
     try {
         const { id } = req.params; 
         const motorista_id = req.usuario.id; 
@@ -95,4 +127,4 @@ async function iniciarEmbarque(req, res) {
     }
 }
 
-module.exports = { solicitarCorrida, aceitar, iniciarEmbarque };
+module.exports = { estimar, solicitarCorrida, aceitarCorrida, iniciarEmbarque };
