@@ -40,4 +40,12 @@ router.post(
     corridaController.iniciarEmbarque
 );
 
+// 5. Finalização da Corrida (Restrito a Motoristas)
+router.post(
+    '/:id/finalizar',
+    verificarToken,
+    apenasMotorista,
+    corridaController.finalizarCorrida
+);
+
 module.exports = router;

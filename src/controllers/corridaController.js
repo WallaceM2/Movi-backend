@@ -127,4 +127,34 @@ async function iniciarEmbarque(req, res) {
     }
 }
 
-module.exports = { estimar, solicitarCorrida, aceitarCorrida, iniciarEmbarque };
+async function finalizarCorrida(req, res) {
+    try {
+        const { id } = req.params;
+        
+        // 1. Muda o status no banco de dados, efetivando a cobrança e os ganhos
+        const corridaFinalizada = await Corrida.atualizarStatus(id, 'concluida');
+        
+        // 2. Avisa o passageiro em tempo real que a viagem acabou
+        // O aplicativo dele vai ler isso e fechar o mapa, abrindo a tela de "Avalie o Motorista"
+        const socketPassageiro = await redisClient.get(`passageiro_socket:${corridaFinalizada.passageiro_id}`);
+        
+        if (socketPassageiro) {
+            const io = req.app.get('io');
+            io.to(socketPassageiro).emit('corrida_finalizada', {
+                mensagem: 'Você chegou ao seu destino!',
+                corrida: corridaFinalizada
+            });
+        }
+        
+        // 3. Libera o motorista devolvendo o sucesso para o celular dele
+        res.json({ 
+            mensagem: 'Corrida finalizada com sucesso! Ganhos computados.', 
+            corrida: corridaFinalizada 
+        });
+    } catch (erro) {
+        console.error('Erro ao finalizar corrida:', erro);
+        res.status(500).json({ erro: 'Erro ao finalizar a corrida.' });
+    }
+}
+
+module.exports = { estimar, solicitarCorrida, aceitarCorrida, iniciarEmbarque, finalizarCorrida };
