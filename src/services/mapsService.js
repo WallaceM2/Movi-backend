@@ -13,18 +13,18 @@ async function calcularRota(origem_lat, origem_lng, destino_lat, destino_lng, ca
     const distanciaKm = rota.distance / 1000;
     const tempoMin = rota.duration / 60;
 
-    // A sua Lógica de Mercado
+    // A sua Lógica de Mercado Oficial Definitiva
     const regrasPreco = {
         moto: {
             taxaBase: 2.00,
-            valorPorKm: 0.90,
-            valorPorMinuto: 0.12,
-            tarifaMinimaCliente: 5.50, // Ajustado para R$ 5,50
+            valorPorKm: 1.00,     // <-- Cravado R$ 1,00 por KM
+            valorPorMinuto: 0.15,
+            tarifaMinimaCliente: 5.50, 
             comissaoApp: 0.15 
         },
         carro: {
             taxaBase: 4.00,
-            valorPorKm: 1.60,
+            valorPorKm: 1.50,     // <-- Cravado R$ 1,50 por KM
             valorPorMinuto: 0.25,
             tarifaMinimaCliente: 9.00, 
             comissaoApp: 0.15 
