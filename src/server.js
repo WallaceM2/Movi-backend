@@ -109,6 +109,16 @@ app.use((err, req, res, next) => {
     res.status(500).json({ erro: 'Erro interno no servidor.' });
 });
 
+// ROTA TEMPORÁRIA PARA LIMPAR O REDIS
+app.get('/limpar-radar', async (req, res) => {
+    try {
+        await redisClient.flushAll();
+        res.json({ mensagem: 'Radar limpo! Todos os motoristas foram removidos da memória.' });
+    } catch (erro) {
+        res.status(500).json({ erro: 'Falha ao limpar Redis' });
+    }
+});
+
 // 7. Inicialização do Servidor
 server.listen(PORT, () => {
     console.log(`🚀 Servidor rodando em http://localhost:${PORT}`);

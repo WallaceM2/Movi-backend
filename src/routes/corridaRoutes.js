@@ -48,4 +48,11 @@ router.post(
     corridaController.finalizarCorrida
 );
 
+// 6. Cancelamento da Corrida (Permitido para ambos)
+router.post(
+    '/:id/cancelar',
+    verificarToken,
+    corridaController.cancelarCorrida
+);
+
 module.exports = router;
