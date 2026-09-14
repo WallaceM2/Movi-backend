@@ -217,4 +217,11 @@ async function cancelarCorrida(req, res) {
     }
 }
 
+
+const query = `
+    INSERT INTO corridas (passageiro_id, origem, destino, valor, ganho_motorista, ganho_app, status)
+    VALUES ($1, $2, $3, $4, $5, $6, $7) RETURNING *;
+`;
+// Onde $5 e $6 são os valores já descontados os 15%
+
 module.exports = { estimar, solicitarCorrida, aceitarCorrida, iniciarEmbarque, finalizarCorrida, cancelarCorrida };

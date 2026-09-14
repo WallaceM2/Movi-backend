@@ -19,6 +19,10 @@ const corridaRoutes = require('./routes/corridaRoutes');
 const app = express();
 const PORT = process.env.PORT || 3000;
 
+const historicoRoutes = require('./routes/historicoRoutes');
+const documentoRoutes = require('./routes/documentoRoutes');
+const denunciaRoutes = require('./routes/denunciaRoutes');
+
 // 3. Configuração do Servidor HTTP e Socket.io
 const server = http.createServer(app);
 const io = new Server(server, {
@@ -97,6 +101,9 @@ app.use('/api', passageiroRoutes);
 app.use('/api', adminRoutes);
 app.use('/api', avaliacaoRoutes);
 app.use('/api/corridas', corridaRoutes);
+app.use('/api', historicoRoutes);
+app.use('/api', documentoRoutes);
+app.use('/api', denunciaRoutes);
 
 // Rota de Teste (Root)
 app.get('/', (req, res) => {
