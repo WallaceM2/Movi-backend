@@ -20,10 +20,17 @@ async function cadastrar(req, res) {
         if (erro.code === '23505') {
             return res.status(409).json({ erro: 'CPF ou email já cadastrado.' });
         }
-        console.log(erro);
+        
+        console.error('ERRO DETALHADO:', erro);
+
+        // Força a extração de qualquer propriedade de erro para o Postman exibir
+        const mensagemErro = erro.message || erro.toString();
+        const detalhesExtras = JSON.stringify(erro, Object.getOwnPropertyNames(erro));
+
         res.status(500).json({ 
             erro: 'Erro interno ao cadastrar passageiro.',
-            detalhe_tecnico: erro.message 
+            detalhe_tecnico: mensagemErro,
+            json_completo: detalhesExtras
         });
     }
 }
