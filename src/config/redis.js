@@ -1,12 +1,9 @@
 const redis = require('redis');
 
-// Em produção, a URL virá do arquivo .env (ex: REDIS_URL=redis://usuario:senha@host:porta)
-// Para o seu ambiente local, ele usa o padrão 127.0.0.1:6379
-
+// Se houver uma REDISS_URL ou REDIS_URL, extrai ou usa a configuração segura
 const redisClient = redis.createClient({
     url: process.env.REDIS_URL || 'redis://localhost:6379',
     socket: {
-        // Detecta automaticamente se a URL usa SSL/TLS (rediss://) e aplica a configuração de segurança
         tls: process.env.REDIS_URL && process.env.REDIS_URL.startsWith('rediss://'),
         rejectUnauthorized: false
     }
@@ -24,7 +21,6 @@ redisClient.on('ready', () => {
     console.log('🟢 Redis conectado! Radar GPS pronto para uso.');
 });
 
-// Inicializa a conexão assíncrona assim que o módulo for importado
 (async () => {
     try {
         await redisClient.connect();
