@@ -52,6 +52,8 @@ async function solicitarCorrida(req, res) {
             destino_lat, 
             destino_lng, 
             valor: estimativaOficial.valorPassageiro,
+            ganho_motorista: estimativaOficial.ganhoMotorista, // LINHA ADICIONADA
+            ganho_app: estimativaOficial.ganhoApp,             // LINHA ADICIONADA
             status: 'solicitada' 
         });
 
@@ -106,6 +108,9 @@ async function aceitarCorrida(req, res) {
         const { id } = req.params; 
         const motorista_id = req.usuario.id; 
 
+        console.log(`A corrida solicitada foi a de ID: ${id}`);
+        console.log(`O dono deste token tem o ID: ${motorista_id}`);
+
         const corridaAceita = await Corrida.aceitar(id, motorista_id);
 
         if (!corridaAceita) {
@@ -118,7 +123,9 @@ async function aceitarCorrida(req, res) {
 
         if (socketPassageiro) {
             const io = req.app.get('io');
-            io.to(socketPassageiro).emit('corrida_aceita', corridaAceita);
+            if (io) {
+                io.to(socketPassageiro).emit('corrida_aceita', corridaAceita);
+            }
         }
 
         res.json({
@@ -126,8 +133,11 @@ async function aceitarCorrida(req, res) {
             corrida: corridaAceita
         });
     } catch (erro) {
-        console.error('Erro no controller aceitar corrida:', erro);
-        res.status(500).json({ erro: 'Erro ao aceitar corrida.' });
+        console.error('ERRO DETALHADO:', erro);
+        res.status(500).json({ 
+            erro: 'Erro interno ao aceitar corrida.',
+            detalhe_tecnico: erro.message || erro.toString()
+        });
     }
 }
 

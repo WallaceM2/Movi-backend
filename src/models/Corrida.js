@@ -3,21 +3,24 @@ const pool = require('../config/database');
 async function criar(dados) {
     const { 
         passageiro_id, origem, destino, 
-        origem_lat, origem_lng, destino_lat, destino_lng, valor 
+        origem_lat, origem_lng, destino_lat, destino_lng, valor,
+        ganho_motorista, ganho_app // VARIÁVEIS ADICIONADAS AQUI
     } = dados;
 
     const query = `
         INSERT INTO corridas (
             passageiro_id, origem, destino, 
-            origem_lat, origem_lng, destino_lat, destino_lng, valor, status
+            origem_lat, origem_lng, destino_lat, destino_lng, valor, status,
+            ganho_motorista, ganho_app
         )
-        VALUES ($1, $2, $3, $4, $5, $6, $7, $8, 'solicitada')
+        VALUES ($1, $2, $3, $4, $5, $6, $7, $8, 'solicitada', $9, $10)
         RETURNING *;
     `;
     
     const valores = [
         passageiro_id, origem, destino, 
-        origem_lat, origem_lng, destino_lat, destino_lng, valor
+        origem_lat, origem_lng, destino_lat, destino_lng, valor,
+        ganho_motorista, ganho_app // VALORES ADICIONADOS AQUI
     ];
 
     const { rows } = await pool.query(query, valores);
