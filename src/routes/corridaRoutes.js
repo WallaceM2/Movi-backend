@@ -8,19 +8,24 @@ const {
     apenasPassageiro
 } = require('../middlewares/authMiddleware');
 
-// 1. Estimativa da Viagem com OSRM (Restrito a Passageiros) - SEMPRE ANTES DOS IDs
+// Importa a nova trava de validação de dados
+const { validarCorrida } = require('../middlewares/validacaoMiddleware');
+
+// 1. Estimativa da Viagem com OSRM (Restrito a Passageiros e Dados Validados)
 router.post(
     '/estimar',
     verificarToken,
     apenasPassageiro,
+    validarCorrida, // <-- Validação Joi inserida aqui
     corridaController.estimar
 );
 
-// 2. Solicitação da Viagem (Restrito a Passageiros)
+// 2. Solicitação da Viagem (Restrito a Passageiros e Dados Validados)
 router.post(
     '/solicitar',
     verificarToken,
     apenasPassageiro,
+    validarCorrida, // <-- Validação Joi inserida aqui
     corridaController.solicitarCorrida
 );
 

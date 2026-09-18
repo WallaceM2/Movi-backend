@@ -196,7 +196,7 @@ async function cancelarCorrida(req, res) {
 
         // 2. Notifica a outra parte via Socket.io
         if (tipo_usuario === 'passageiro') {
-            // Se o passageiro cancelou, avisa o motorista (se já houver um)
+            // Se o passageiro cancelou, avisar ao motorista.
             if (corridaCancelada.motorista_id) {
                 const socketMotorista = await redisClient.get(`motorista_socket:${corridaCancelada.motorista_id}`);
                 if (socketMotorista) {
