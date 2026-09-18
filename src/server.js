@@ -3,11 +3,12 @@ const express = require('express');
 const http = require('http');
 const { Server } = require('socket.io');
 const helmet = require('helmet');
+const morgan = require('morgan'); // NOVO: Importação do Morgan
 require('./config/database');
 const redisClient = require('./config/redis');
 
 // 1. Importações de Banco e Middlewares Customizados
-const { limiteGeral } = require('./middlewares/rateLimiter');
+const { limiteGeral, limiteAuth } = require('./middlewares/rateLimiter');
 
 // 2. Importações de Rotas
 const motoristaRoutes = require('./routes/motoristaRoutes');
@@ -15,13 +16,16 @@ const passageiroRoutes = require('./routes/passageiroRoutes');
 const adminRoutes = require('./routes/adminRoutes');
 const avaliacaoRoutes = require('./routes/avaliacaoRoutes');
 const corridaRoutes = require('./routes/corridaRoutes');
+const historicoRoutes = require('./routes/historicoRoutes');
+const documentoRoutes = require('./routes/documentoRoutes');
+const denunciaRoutes = require('./routes/denunciaRoutes');
+const healthRoutes = require('./routes/healthRoutes'); // NOVO: Rota de Health Check
 
 const app = express();
 const PORT = process.env.PORT || 3000;
 
-const historicoRoutes = require('./routes/historicoRoutes');
-const documentoRoutes = require('./routes/documentoRoutes');
-const denunciaRoutes = require('./routes/denunciaRoutes');
+// CRÍTICO PARA O RENDER: Permite capturar o IP real do usuário passando pelo proxy da nuvem
+app.set('trust proxy', 1);
 
 // 3. Configuração do Servidor HTTP e Socket.io
 const server = http.createServer(app);
@@ -32,28 +36,20 @@ const io = new Server(server, {
 io.on('connection', (socket) => {
     console.log(`Novo dispositivo conectado: ${socket.id}`);
 
-    // =======================================================
-    // TELEMETRIA E REGISTRO DE GPS DO MOTORISTA (UNIFICADO)
-    // =======================================================
     socket.on('atualizar_localizacao', async (dados) => {
-        // Recebe: { motorista_id, passageiro_id, lat, lng, direcao }
         const { motorista_id, passageiro_id, lat, lng, direcao } = dados;
 
         try {
             if (motorista_id) {
-                // 1. Atualiza as coordenadas no radar geoespacial do Redis
                 await redisClient.geoAdd('motoristas_disponiveis', {
                     longitude: lng,
                     latitude: lat,
                     member: String(motorista_id)
                 });
 
-                // 2. Registra o socket.id atual do motorista para ofertas de corrida
                 await redisClient.set(`motorista_socket:${motorista_id}`, socket.id);
             }
 
-            // 3. ESPELHO DE NAVEGAÇÃO: Se o motorista estiver em uma corrida ativa,
-            // retransmite o sinal de GPS direto para o aplicativo do passageiro em tempo real
             if (passageiro_id) {
                 const socketPassageiro = await redisClient.get(`passageiro_socket:${passageiro_id}`);
 
@@ -61,7 +57,7 @@ io.on('connection', (socket) => {
                     io.to(socketPassageiro).emit('motorista_em_movimento', {
                         lat,
                         lng,
-                        direcao: direcao || 0 // Usado pelo front-end para rotacionar o ícone da moto/carro
+                        direcao: direcao || 0 
                     });
                 }
             }
@@ -70,7 +66,6 @@ io.on('connection', (socket) => {
         }
     });
 
-    // Registro do Passageiro (Necessário para ele receber notificações e GPS)
     socket.on('registrar_passageiro', async (dados) => {
         try {
             if (dados.passageiro_id) {
@@ -93,7 +88,16 @@ app.set('io', io);
 app.use(helmet()); 
 app.use(express.json({ limit: '10kb' })); 
 app.use('/uploads', express.static('uploads'));
+
+// NOVO: Middleware de log estruturado (formato 'dev' é excelente para leitura no terminal)
+app.use(morgan('dev'));
+
+// Aplica o limite geral para toda a API
 app.use('/api', limiteGeral);
+
+// Aplica o limite rigoroso especificamente nas rotas de autenticação/login
+app.use('/api/passageiros/login', limiteAuth);
+app.use('/api/motoristas/login', limiteAuth);
 
 // 5. Injeção de Rotas
 app.use('/api', motoristaRoutes);
@@ -104,6 +108,9 @@ app.use('/api/corridas', corridaRoutes);
 app.use('/api', historicoRoutes);
 app.use('/api', documentoRoutes);
 app.use('/api', denunciaRoutes);
+
+// NOVO: Rota avançada de Health Check
+app.use('/health', healthRoutes);
 
 // Rota de Teste (Root)
 app.get('/', (req, res) => {

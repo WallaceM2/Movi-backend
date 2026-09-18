@@ -1,17 +1,21 @@
 const rateLimit = require('express-rate-limit');
 
-// Limite geral: aplica em toda a API
+// Limite geral da API: 100 requisições a cada 15 minutos por IP
 const limiteGeral = rateLimit({
-    windowMs: 15 * 60 * 1000, // 15 minutos
-        max: 100, // no máximo 100 requisições por IP nesse período
-            message: { erro: ' Muitas requisições. Tente novamente em alguns minutos. '}
-});
-
-// Limite mais rígido, específico pra rotas de login (contra força bruta de senha)
-const limiteLogin = rateLimit({
     windowMs: 15 * 60 * 1000, 
-        max: 5, // só 5 tentativas de login por IP a cada 15 minutos
-            message: { erro: 'Muitas tentativas de login. Tente novamente em 15 minutos.'}
+    max: 100, 
+    message: { erro: 'Muitas requisições deste IP. Por favor, aguarde 15 minutos.' },
+    standardHeaders: true, 
+    legacyHeaders: false, 
 });
 
-module.exports = { limiteGeral, limiteLogin };
+// Limite rigoroso para Login/Cadastro: 10 tentativas a cada 15 minutos por IP
+const limiteAuth = rateLimit({
+    windowMs: 15 * 60 * 1000, 
+    max: 10, 
+    message: { erro: 'Muitas tentativas de acesso. Bloqueado por 15 minutos por segurança.' },
+    standardHeaders: true,
+    legacyHeaders: false,
+});
+
+module.exports = { limiteGeral, limiteAuth };
