@@ -8,14 +8,13 @@ async function estimar(req, res) {
         const { origem_lat, origem_lng, destino_lat, destino_lng, categoria } = req.body;
         
         // 1. Registra o passageiro no mapa de calor
-        // Usamos o IP ou um ID temporário se ele não estiver logado
         const passageiroVirtual = req.usuario ? req.usuario.id : Date.now();
         await registrarDemanda(origem_lat, origem_lng, passageiroVirtual);
 
-        // 2. O Robô calcula a dinâmica baseado em quem está na rua AGORA
+        // 2. Calcula a dinâmica
         const dinamicaAutomatica = await calcularMultiplicador(origem_lat, origem_lng);
 
-        // 3. Calcula o preço blindado
+        // 3. Calcula o preço
         const estimativa = await calcularRota(origem_lat, origem_lng, destino_lat, destino_lng, categoria, dinamicaAutomatica);
         
         return res.json({
@@ -30,19 +29,14 @@ async function estimar(req, res) {
 
 async function solicitarCorrida(req, res) {
     try {
-        const { origem, destino, origem_lat, origem_lng, destino_lat, destino_lng, categoria } = req.body;
+        const { origem, destino, origem_lat, origem_lng, destino_lat, destino_lng, categoria, forma_pagamento } = req.body;
         const passageiro_id = req.usuario.id; 
 
-        // 1. Registra o passageiro no mapa de calor do Redis
         await registrarDemanda(origem_lat, origem_lng, passageiro_id);
-        
-        // 2. Calcula a dinâmica em tempo real (agora com a demanda registrada)
         const dinamicaAutomatica = await calcularMultiplicador(origem_lat, origem_lng);
-        
-        // 3. Calcula o valor final blindado
         const estimativaOficial = await calcularRota(origem_lat, origem_lng, destino_lat, destino_lng, categoria, dinamicaAutomatica);
 
-        // Gravamos no banco o valor blindado
+        // Cria a corrida (O modelo agora valida o débito pendente!)
         const novaCorrida = await Corrida.criar({ 
             passageiro_id, 
             origem, 
@@ -52,9 +46,9 @@ async function solicitarCorrida(req, res) {
             destino_lat, 
             destino_lng, 
             valor: estimativaOficial.valorPassageiro,
-            ganho_motorista: estimativaOficial.ganhoMotorista, // LINHA ADICIONADA
-            ganho_app: estimativaOficial.ganhoApp,             // LINHA ADICIONADA
-            status: 'solicitada' 
+            ganho_motorista: estimativaOficial.ganhoMotorista, 
+            ganho_app: estimativaOficial.ganhoApp,
+            forma_pagamento: forma_pagamento || 'dinheiro' // Passamos a forma de pagamento
         });
 
         // Busca motoristas
@@ -82,6 +76,7 @@ async function solicitarCorrida(req, res) {
                     distancia_km: estimativaOficial.distanciaKm,
                     tempo_minutos: estimativaOficial.tempoMin,
                     conta_verificada: true, 
+                    forma_pagamento: novaCorrida.forma_pagamento, // Informa ao motorista a forma de pgto
                     coordenadas: {
                         origem: { lat: origem_lat, lng: origem_lng },
                         destino: { lat: destino_lat, lng: destino_lng }
@@ -99,6 +94,10 @@ async function solicitarCorrida(req, res) {
         });
     } catch (erro) {
         console.error('Erro no controller solicitarCorrida:', erro);
+        // Tratamento específico para o bloqueio de dívida
+        if (erro.message.includes('BLOQUEIO_DEBITO')) {
+             return res.status(403).json({ erro: erro.message });
+        }
         res.status(500).json({ erro: 'Erro ao solicitar corrida' });
     }
 }
@@ -108,36 +107,23 @@ async function aceitarCorrida(req, res) {
         const { id } = req.params; 
         const motorista_id = req.usuario.id; 
 
-        console.log(`A corrida solicitada foi a de ID: ${id}`);
-        console.log(`O dono deste token tem o ID: ${motorista_id}`);
-
         const corridaAceita = await Corrida.aceitar(id, motorista_id);
 
         if (!corridaAceita) {
-            return res.status(409).json({ 
-                erro: 'Esta corrida já foi aceita por outro motorista ou cancelada.' 
-            });
+            return res.status(409).json({ erro: 'Esta corrida já foi aceita por outro motorista ou cancelada.' });
         }
 
         const socketPassageiro = await redisClient.get(`passageiro_socket:${corridaAceita.passageiro_id}`);
 
         if (socketPassageiro) {
             const io = req.app.get('io');
-            if (io) {
-                io.to(socketPassageiro).emit('corrida_aceita', corridaAceita);
-            }
+            if (io) io.to(socketPassageiro).emit('corrida_aceita', corridaAceita);
         }
 
-        res.json({
-            mensagem: 'Corrida aceita com sucesso!',
-            corrida: corridaAceita
-        });
+        res.json({ mensagem: 'Corrida aceita com sucesso!', corrida: corridaAceita });
     } catch (erro) {
         console.error('ERRO DETALHADO:', erro);
-        res.status(500).json({ 
-            erro: 'Erro interno ao aceitar corrida.',
-            detalhe_tecnico: erro.message || erro.toString()
-        });
+        res.status(500).json({ erro: 'Erro interno ao aceitar corrida.', detalhe_tecnico: erro.message });
     }
 }
 
@@ -145,7 +131,6 @@ async function iniciarEmbarque(req, res) {
     try {
         const { id } = req.params;
         const corridaAtualizada = await Corrida.atualizarStatus(id, 'em_andamento');
-        
         res.json({ mensagem: 'Corrida iniciada', corrida: corridaAtualizada });
     } catch (erro) {
         console.error(erro);
@@ -153,85 +138,73 @@ async function iniciarEmbarque(req, res) {
     }
 }
 
+// ----------------------------------------------------
+// NOVA FUNÇÃO: FINALIZAR CORRIDA COM LÓGICA DE PAGAMENTO
+// ----------------------------------------------------
 async function finalizarCorrida(req, res) {
     try {
-        const { id } = req.params;
-        
-        // 1. Muda o status no banco de dados, efetivando a cobrança e os ganhos
-        const corridaFinalizada = await Corrida.atualizarStatus(id, 'concluida');
-        
-        // 2. Avisa o passageiro em tempo real que a viagem acabou
-        // O aplicativo dele vai ler isso e fechar o mapa, abrindo a tela de "Avalie o Motorista"
+        const { id } = req.params; // ID da corrida
+        // Dados vindos do app do motorista
+        const { status_pagamento = 'pago', valor_recebido_motorista = null, observacao_pagamento = '' } = req.body; 
+
+        // 1. Efetiva o pagamento e as regras de negócio no banco
+        const resultadoFinanceiro = await Corrida.finalizarComPagamento(id, {
+            status_pagamento,
+            valor_recebido_motorista,
+            observacao_pagamento
+        });
+
+        // 2. Busca a corrida para enviar os dados corretos via Socket
+        const corridaFinalizada = await Corrida.buscarPorId(id);
+
+        // 3. Avisa o passageiro
         const socketPassageiro = await redisClient.get(`passageiro_socket:${corridaFinalizada.passageiro_id}`);
-        
         if (socketPassageiro) {
             const io = req.app.get('io');
             io.to(socketPassageiro).emit('corrida_finalizada', {
                 mensagem: 'Você chegou ao seu destino!',
-                corrida: corridaFinalizada
+                corrida: corridaFinalizada,
+                status_pagamento: status_pagamento
             });
         }
         
-        // 3. Libera o motorista devolvendo o sucesso para o celular dele
+        // 4. Libera o motorista
         res.json({ 
-            mensagem: 'Corrida finalizada com sucesso! Ganhos computados.', 
-            corrida: corridaFinalizada 
+            mensagem: 'Corrida finalizada com sucesso! Ganhos e débitos computados.', 
+            corrida: corridaFinalizada,
+            financeiro: resultadoFinanceiro
         });
     } catch (erro) {
         console.error('Erro ao finalizar corrida:', erro);
-        res.status(500).json({ erro: 'Erro ao finalizar a corrida.' });
+        res.status(500).json({ erro: 'Erro ao finalizar a corrida ou processar o pagamento.' });
     }
 }
 
 async function cancelarCorrida(req, res) {
     try {
         const { id } = req.params;
-        const usuario_id = req.usuario.id;
-        const tipo_usuario = req.usuario.tipo; // 'passageiro' ou 'motorista'
+        const tipo_usuario = req.usuario.tipo; 
 
-        // 1. Atualiza o status no banco de dados
         const corridaCancelada = await Corrida.atualizarStatus(id, 'cancelada');
-
         const io = req.app.get('io');
 
-        // 2. Notifica a outra parte via Socket.io
-        if (tipo_usuario === 'passageiro') {
-            // Se o passageiro cancelou, avisar ao motorista.
-            if (corridaCancelada.motorista_id) {
-                const socketMotorista = await redisClient.get(`motorista_socket:${corridaCancelada.motorista_id}`);
-                if (socketMotorista) {
-                    io.to(socketMotorista).emit('corrida_cancelada', {
-                        mensagem: 'O passageiro cancelou a corrida.',
-                        corrida_id: id
-                    });
-                }
+        if (tipo_usuario === 'passageiro' && corridaCancelada.motorista_id) {
+            const socketMotorista = await redisClient.get(`motorista_socket:${corridaCancelada.motorista_id}`);
+            if (socketMotorista) {
+                io.to(socketMotorista).emit('corrida_cancelada', { mensagem: 'O passageiro cancelou a corrida.', corrida_id: id });
             }
         } else if (tipo_usuario === 'motorista') {
-            // Se o motorista cancelou, avisa o passageiro
             const socketPassageiro = await redisClient.get(`passageiro_socket:${corridaCancelada.passageiro_id}`);
             if (socketPassageiro) {
-                io.to(socketPassageiro).emit('corrida_cancelada', {
-                    mensagem: 'O motorista cancelou a corrida. Buscando outro...',
-                    corrida_id: id
-                });
+                io.to(socketPassageiro).emit('corrida_cancelada', { mensagem: 'O motorista cancelou a corrida. Buscando outro...', corrida_id: id });
             }
         }
 
-        res.json({ 
-            mensagem: 'Corrida cancelada com sucesso.', 
-            corrida: corridaCancelada 
-        });
+        res.json({ mensagem: 'Corrida cancelada com sucesso.', corrida: corridaCancelada });
     } catch (erro) {
         console.error('Erro ao cancelar corrida:', erro);
         res.status(500).json({ erro: 'Erro ao cancelar a corrida.' });
     }
 }
-
-
-const query = `
-    INSERT INTO corridas (passageiro_id, origem, destino, valor, ganho_motorista, ganho_app, status)
-    VALUES ($1, $2, $3, $4, $5, $6, $7) RETURNING *;
-`;
-// Onde $5 e $6 são os valores já descontados os 15%
 
 module.exports = { estimar, solicitarCorrida, aceitarCorrida, iniciarEmbarque, finalizarCorrida, cancelarCorrida };
