@@ -1,4 +1,5 @@
 const Avaliacao = require('../models/Avaliacao');
+const pool = require('../config/database'); // Precisamos do pool para suspender a conta
 
 async function criar(req, res) {
   try {
@@ -19,12 +20,30 @@ async function criar(req, res) {
       avaliado_tipo, avaliado_id, avaliador_tipo, avaliador_id, nota, tag, comentario
     });
 
-    const perfilAtualizado = await Avaliacao.atualizarMedia(avaliado_tipo, avaliado_id, nota);
+    // O seu modelo já atualiza a média lá no banco e nos devolve o valor atualizado
+    const novaMedia = await Avaliacao.atualizarMedia(avaliado_tipo, avaliado_id, nota);
+    const mediaNumerica = parseFloat(novaMedia);
+
+    // --- NOVA REGRA DE NEGÓCIO: SUSPENSÃO AUTOMÁTICA ---
+    let statusConta = 'ativa';
+    let punicaoAplicada = false;
+
+    if (avaliado_tipo === 'motorista' && mediaNumerica < 4.5) {
+        statusConta = 'suspensa';
+        punicaoAplicada = true;
+        await pool.query('UPDATE motoristas SET status_conta = $1 WHERE id = $2', [statusConta, avaliado_id]);
+    } else if (avaliado_tipo === 'passageiro' && mediaNumerica < 4.0) {
+        statusConta = 'bloqueada';
+        punicaoAplicada = true;
+        await pool.query('UPDATE passageiros SET status_conta = $1 WHERE id = $2', [statusConta, avaliado_id]);
+    }
+    // ---------------------------------------------------
 
     res.status(201).json({
       mensagem: 'Avaliação registrada com sucesso!',
       avaliacao: novaAvaliacao,
-      novaMedia: perfilAtualizado
+      novaMedia: mediaNumerica.toFixed(2),
+      conta_suspensa: punicaoAplicada
     });
 
   } catch (erro) {

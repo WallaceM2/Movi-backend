@@ -27,4 +27,6 @@ router.post (
         passageiroController.uploadDocumentos
 );
 
+router.post('/passageiros/quitar-debito', verificarToken, passageiroController.quitarDebito);
+
 module.exports = router;

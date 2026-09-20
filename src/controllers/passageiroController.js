@@ -1,6 +1,7 @@
 const Passageiro = require('../models/Passageiro');
 const bcrypt = require('bcrypt');
 const jwt = require('jsonwebtoken');
+const pool = require('../config/database');
 
 async function cadastrar(req, res) {
     try {
@@ -115,4 +116,43 @@ async function uploadDocumentos(req, res) {
     }
 }
 
-module.exports = { cadastrar, listar, login, uploadDocumentos };
+async function quitarDebito(req, res) {
+    try {
+        const passageiroId = req.usuario.id; 
+        const { metodoPagamento } = req.body; // Pega como o app enviou (ex: 'pix', 'cartao')
+
+        // 1. Busca os dados no banco
+        const consulta = await pool.query('SELECT debito_pendente FROM passageiros WHERE id = $1', [passageiroId]); 
+
+        // 2. Se não encontrou o passageiro no banco
+        if (consulta.rows.length === 0) { 
+            return res.status(404).json({ erro: 'Passageiro não encontrado.' });
+        }
+
+        const debitoAtual = parseFloat(consulta.rows[0].debito_pendente);
+
+        // 3. Se o passageiro não deve nada
+        if (debitoAtual <= 0) {
+            return res.status(400).json({ erro: 'Não há débito pendente para quitar.' });
+        } 
+
+        // --- INTEGRAÇÃO FUTURA ---
+        // Aqui entraria a chamada real para a API do MercadoPago ou Stripe.
+
+        // 4. Atualiza o débito do passageiro para zero
+        await pool.query('UPDATE passageiros SET debito_pendente = 0.00 WHERE id = $1', [passageiroId]);
+        
+        // 5. Devolve o sucesso
+        res.json({
+            sucesso: true,
+            mensagem: 'Débito quitado com sucesso! Você já pode solicitar corridas em dinheiro.',
+            valor_pago: debitoAtual,
+            metodo_pagamento: metodoPagamento || 'pix'
+        });
+
+    } catch (erro) {
+        console.error('Erro ao processar quitação de débito:', erro);
+        res.status(500).json({ erro: 'Erro ao processar quitação de débito.' });
+    }       
+}
+module.exports = { cadastrar, listar, login, uploadDocumentos, quitarDebito };
